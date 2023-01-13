@@ -56,6 +56,9 @@ app.post("/participants", async (req, res) => {
 });
 
 app.get("/participants", async (req, res) => {
+    const milissegundos = Date.now();
+    const segundos = dayjs(milissegundos).format("ss");
+    console.log(Number(segundos));
     try {
         const participants = await db.collection("participants").find().toArray();
 
@@ -66,13 +69,51 @@ app.get("/participants", async (req, res) => {
     }
 });
 
-app.get("/messages", async (req, res) => {
-    try {
-        const messages = await db.collection("messages").find().toArray();
+app.post("/messages", async (req, res) => {
+    const { to, text, type } = req.body;
+    const { user } = req.header.user;
+    const milissegundos = Date.now();
+    const date = dayjs(milissegundos).format("HH:mm:ss");
 
-        res.send(messages);
+    const checkUser = await db.collection("participants").findOne({ name: user });
+
+    if (!to || !text || type != "message" || type != "private-message" || !user || !checkUser)
+        return res.sendStatus(422);
+
+    try {
+        await db.collection("messages").insertOne({ from: user, to, text, type, date });
+        return res.sendStatus(201);
     } catch (error) {
         console.log(error);
+        res.status(401).send("Erro ao enviar!");
+    }
+});
+
+app.get("/messages", async (req, res) => {
+    const { limit } = req.query;
+    const user = req.headers.user;
+
+    console.log(user);
+
+    try {
+        let messages;
+
+        if (user) {
+            messages = await db.collection("messages").find({ from: user }).toArray();
+        } else {
+            messages = await db.collection("messages").find().toArray();
+        }
+
+        const ultimasMessages = [...messages].reverse().slice(0, parseInt(limit));
+
+        if (limit) {
+            return res.send(ultimasMessages);
+        }
+
+        return res.send(messages);
+    } catch (error) {
+        console.log(error);
+        return res.status(404).send(error);
     }
 });
 
