@@ -57,10 +57,10 @@ app.post("/participants", async (req, res) => {
         await db.collection("participants").insertOne({ name, lastStatus: milissegundos });
 
         await db.collection("messages").insertOne({
-            from: name,
             to: "Todos",
             text: "entra na sala...",
             type: "status",
+            from: name,
             time: date,
         });
 
@@ -75,7 +75,7 @@ app.get("/messages", async (req, res) => {
     const { limit } = req.query;
     const user = req.headers.user;
 
-    if (limit <= 0 || typeof limit === "function" || typeof limit === "string") {
+    if (limit <= 0 || typeof limit === "function" || !(typeof limit === "string")) {
         return res.sendStatus(422);
     }
 
@@ -98,11 +98,11 @@ app.get("/messages", async (req, res) => {
         // console.log(messagesAll);
         // console.log(messagePrivateSend);
         // console.log(messagePrivateReceived);
-        const messageSend = messages.map((message) => {
-            return { to: message.to, text: message.text, type: message.type, from: message.from };
-        });
+        // const messageSend = messages.map((message) => {
+        //     return { to: message.to, text: message.text, type: message.type, from: message.from };
+        // });
 
-        const ultimasMessages = [...messageSend].reverse().slice(0, parseInt(limit)).reverse();
+        const ultimasMessages = [...messages].reverse().slice(0, parseInt(limit)).reverse();
 
         console.log(ultimasMessages);
 
