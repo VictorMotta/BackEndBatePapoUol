@@ -80,19 +80,23 @@ app.get("/messages", async (req, res) => {
     }
 
     try {
-        let messages;
-        // const messages = await db.collection("messages").find().toArray();
+        let messagesFiltered;
+        const messages = await db.collection("messages").find().toArray();
         // const messagesAll = messages.filter((message) => message.to === "Todos");
         // const messagePrivateReceived = messages.filter((message) => message.to === user);
         // const messagePrivateSend = messages.filter((message) => message.from === user);
 
         if (user) {
-            messages = await db
-                .collection("messages")
-                .find({ $or: [{ from: user }, { to: { $in: ["Todos", user] } }] })
-                .toArray();
+            messagesFiltered = messages
+                .filter((message) => message.to === "Todos")
+                .filter((message) => message.to === user)
+                .filter((message) => message.from === user);
+            // messages = await db
+            //     .collection("messages")
+            //     .find({ $or: [{ from: user }, { to: { $in: ["Todos", user] } }] })
+            //     .toArray();
         } else {
-            messages = await db.collection("messages").find().toArray();
+            return res.status(422);
         }
 
         // console.log(messagesAll);
@@ -102,7 +106,7 @@ app.get("/messages", async (req, res) => {
         //     return { to: message.to, text: message.text, type: message.type, from: message.from };
         // });
 
-        const ultimasMessages = [...messages].reverse().slice(0, parseInt(limit)).reverse();
+        const ultimasMessages = [...messagesFiltered].reverse().slice(0, parseInt(limit)).reverse();
 
         console.log(ultimasMessages);
 
