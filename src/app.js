@@ -3,6 +3,7 @@ import cors from "cors";
 import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import dayjs from "dayjs";
+import joi from "joi";
 dotenv.config();
 
 const PORT = 5000;
@@ -21,11 +22,29 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get("/participants", async (req, res) => {
+    try {
+        const participants = await db.collection("participants").find().toArray();
+
+        res.send(participants);
+    } catch (error) {
+        console.log(error);
+        res.status(404).send(error);
+    }
+});
+
 app.post("/participants", async (req, res) => {
     const { name } = req.body;
 
-    if (!name || typeof name != "string") {
-        return res.sendStatus(422);
+    const userSchema = joi.object({
+        name: joi.string().required(),
+    });
+
+    const validation = userSchema.validate({ name });
+
+    if (validation.error) {
+        const errors = validation.error.details.map((detail) => detail.message);
+        return res.status(422).send(errors);
     }
 
     try {
@@ -33,7 +52,7 @@ app.post("/participants", async (req, res) => {
         const date = dayjs(milissegundos).format("HH:mm:ss");
         const checkExists = await db.collection("participants").findOne({ name });
 
-        if (checkExists) return res.sendStatus(409);
+        if (checkExists) return res.status(409).send("Nome que já está sendo utilizado!");
 
         await db.collection("participants").insertOne({ name, lastStatus: milissegundos });
 
@@ -48,44 +67,7 @@ app.post("/participants", async (req, res) => {
         return res.sendStatus(201);
     } catch (error) {
         console.log(error);
-    }
-
-    return res.sendStatus(201);
-});
-
-app.get("/participants", async (req, res) => {
-    try {
-        const participants = await db.collection("participants").find().toArray();
-
-        res.send(participants);
-    } catch (error) {
-        console.log(error);
-        res.status(404).send(error);
-    }
-});
-
-app.post("/messages", async (req, res) => {
-    const { to, text, type } = req.body;
-    const user = req.headers.user;
-    const milissegundos = Date.now();
-    const date = dayjs(milissegundos).format("HH:mm:ss");
-
-    const checkUser = await db.collection("participants").findOne({ name: user });
-
-    if (!type) {
-        if (type != "message" || type != "private-message") {
-            return res.sendStatus(422);
-        }
-    }
-
-    if (!to || !text || !user || !checkUser) return res.sendStatus(422);
-
-    try {
-        await db.collection("messages").insertOne({ from: user, to, text, type, date });
-        return res.sendStatus(201);
-    } catch (error) {
-        console.log(error);
-        res.status(401).send("Erro ao enviar!");
+        return res.sendStatus(500);
     }
 });
 
@@ -117,6 +99,44 @@ app.get("/messages", async (req, res) => {
     } catch (error) {
         console.log(error);
         return res.status(404).send(error);
+    }
+});
+
+app.post("/messages", async (req, res) => {
+    const { to, text, type } = req.body;
+    const user = req.headers.user;
+    const milissegundos = Date.now();
+    const date = dayjs(milissegundos).format("HH:mm:ss");
+
+    const messageSchema = joi.object({
+        to: joi.string().required(),
+        text: joi.string().required(),
+        type: joi.string().valid("message").valid("private_message").required(),
+        from: joi.string().required(),
+    });
+
+    const validation = messageSchema.validate(
+        { to, text, type, from: user },
+        { abortEarly: false }
+    );
+
+    console.log(validation.error);
+
+    if (validation.error) {
+        const errors = validation.error.details.map((detail) => detail.message);
+        return res.status(422).send(errors);
+    }
+
+    const checkUser = await db.collection("participants").findOne({ name: user });
+
+    if (!checkUser) return res.sendStatus(422);
+
+    try {
+        await db.collection("messages").insertOne({ from: user, to, text, type, date });
+        return res.sendStatus(201);
+    } catch (error) {
+        console.log(error);
+        res.status(401).send("Erro ao enviar!");
     }
 });
 
