@@ -75,12 +75,16 @@ app.get("/messages", async (req, res) => {
     const { limit } = req.query;
     const user = req.headers.user;
 
-    if (limit <= 0) {
+    if (limit <= 0 || typeof limit === "function") {
         return res.sendStatus(422);
     }
 
     try {
         let messages;
+        // const messages = await db.collection("messages").find().toArray();
+        // const messagesAll = messages.filter((message) => message.to === "Todos");
+        // const messagePrivateReceived = messages.filter((message) => message.to === user);
+        // const messagePrivateSend = messages.filter((message) => message.from === user);
 
         if (user) {
             messages = await db
@@ -91,7 +95,13 @@ app.get("/messages", async (req, res) => {
             messages = await db.collection("messages").find().toArray();
         }
 
+        // console.log(messagesAll);
+        // console.log(messagePrivateSend);
+        // console.log(messagePrivateReceived);
+
         const ultimasMessages = [...messages].reverse().slice(0, parseInt(limit)).reverse();
+
+        console.log(ultimasMessages);
 
         if (limit) {
             return res.send(ultimasMessages);
@@ -132,7 +142,7 @@ app.post("/messages", async (req, res) => {
     if (!checkUser) return res.sendStatus(422);
 
     try {
-        await db.collection("messages").insertOne({ from: user, to, text, type, time });
+        await db.collection("messages").insertOne({ to, text, type, from: user, time });
         return res.sendStatus(201);
     } catch (error) {
         console.log(error);
