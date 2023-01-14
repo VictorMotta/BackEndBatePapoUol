@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import dayjs from "dayjs";
 dotenv.config();
@@ -23,8 +23,7 @@ app.use(express.json());
 
 app.post("/participants", async (req, res) => {
     const { name } = req.body;
-    console.log("Enviando...");
-    console.log(typeof name);
+
     if (!name || typeof name != "string") {
         return res.sendStatus(422);
     }
@@ -51,14 +50,10 @@ app.post("/participants", async (req, res) => {
         console.log(error);
     }
 
-    console.log("Enviado!");
     return res.sendStatus(201);
 });
 
 app.get("/participants", async (req, res) => {
-    const milissegundos = Date.now();
-    const segundos = dayjs(milissegundos).format("ss");
-    console.log(Number(segundos));
     try {
         const participants = await db.collection("participants").find().toArray();
 
@@ -71,14 +66,19 @@ app.get("/participants", async (req, res) => {
 
 app.post("/messages", async (req, res) => {
     const { to, text, type } = req.body;
-    const { user } = req.header.user;
+    const user = req.headers.user;
     const milissegundos = Date.now();
     const date = dayjs(milissegundos).format("HH:mm:ss");
 
     const checkUser = await db.collection("participants").findOne({ name: user });
 
-    if (!to || !text || type != "message" || type != "private-message" || !user || !checkUser)
-        return res.sendStatus(422);
+    if (!type) {
+        if (type != "message" || type != "private-message") {
+            return res.sendStatus(422);
+        }
+    }
+
+    if (!to || !text || !user || !checkUser) return res.sendStatus(422);
 
     try {
         await db.collection("messages").insertOne({ from: user, to, text, type, date });
@@ -99,12 +99,15 @@ app.get("/messages", async (req, res) => {
         let messages;
 
         if (user) {
-            messages = await db.collection("messages").find({ from: user }).toArray();
+            messages = await db
+                .collection("messages")
+                .find({ $or: [{ from: user }, { to: { $in: ["Todos", user] } }] })
+                .toArray();
         } else {
             messages = await db.collection("messages").find().toArray();
         }
 
-        const ultimasMessages = [...messages].reverse().slice(0, parseInt(limit));
+        const ultimasMessages = [...messages].reverse().slice(0, parseInt(limit)).reverse();
 
         if (limit) {
             return res.send(ultimasMessages);
@@ -116,5 +119,62 @@ app.get("/messages", async (req, res) => {
         return res.status(404).send(error);
     }
 });
+
+app.post("/status", async (req, res) => {
+    const user = req.headers.user;
+    const milissegundos = Date.now();
+
+    console.log(milissegundos);
+    const checkUser = await db.collection("participants").find({ name: user }).toArray();
+
+    console.log(checkUser);
+
+    if (!checkUser || checkUser === null) {
+        return res.status(404);
+    }
+    console.log(checkUser);
+
+    try {
+        const result = await db
+            .collection("participants")
+            .updateOne({ name: user }, { $set: { lastStatus: milissegundos } });
+
+        console.log(result.modifiedCount);
+        console.log(result);
+
+        if (result.modifiedCount === 0) return res.status(404).send("Esse usuário não existe!");
+
+        res.sendStatus(200);
+    } catch (error) {
+        console.log(error);
+        return res.status(500).send(error.message);
+    }
+});
+
+setInterval(async () => {
+    const listParticipants = await db.collection("participants").find().toArray();
+    const milissegundos = Date.now();
+    const hora = dayjs(milissegundos).format("HH:mm:ss");
+
+    const usersDeleted = await listParticipants.filter((item) => {
+        return item.lastStatus + 10000 <= Date.now();
+    });
+
+    try {
+        await usersDeleted.map(async (user) => {
+            await db.collection("messages").insertOne({
+                from: user.name,
+                to: "Todos",
+                text: "sai da sala...",
+                type: "status",
+                time: hora,
+            });
+            await db.collection("participants").deleteMany(user);
+        });
+        console.log("Usuários ociosos desconectado!");
+    } catch (error) {
+        console.log(error);
+    }
+}, 15000);
 
 app.listen(PORT, () => console.log(`O servidor está rodando na porta ${PORT}!`));
