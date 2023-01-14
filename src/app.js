@@ -108,13 +108,11 @@ app.get("/messages", async (req, res) => {
 
         const ultimasMessages = [...messagesFiltered].reverse().slice(0, parseInt(limit)).reverse();
 
-        console.log(ultimasMessages);
-
         if (limit) {
             return res.send(ultimasMessages);
         }
 
-        return res.send(messages);
+        return res.send(messagesFiltered);
     } catch (error) {
         console.log(error);
         return res.status(404).send(error);
