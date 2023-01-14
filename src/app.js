@@ -49,7 +49,7 @@ app.post("/participants", async (req, res) => {
 
     try {
         const milissegundos = Date.now();
-        const date = dayjs(milissegundos).format("HH:mm:ss");
+        const time = dayjs(milissegundos).format("HH:mm:ss");
         const checkExists = await db.collection("participants").findOne({ name });
 
         if (checkExists) return res.status(409).send("Nome que já está sendo utilizado!");
@@ -61,7 +61,7 @@ app.post("/participants", async (req, res) => {
             text: "entra na sala...",
             type: "status",
             from: name,
-            time: date,
+            time,
         });
 
         return res.sendStatus(201);
@@ -75,44 +75,50 @@ app.get("/messages", async (req, res) => {
     const { limit } = req.query;
     const user = req.headers.user;
 
-    if (limit <= 0 || typeof limit === "function" || !(typeof limit === "string")) {
+    if (limit <= 0) {
+        return res.sendStatus(422);
+    }
+
+    if (!user) {
         return res.sendStatus(422);
     }
 
     try {
-        let messagesFiltered;
-        const messages = await db.collection("messages").find().toArray();
-        // const messagesAll = messages.filter((message) => message.to === "Todos");
-        // const messagePrivateReceived = messages.filter((message) => message.to === user);
-        // const messagePrivateSend = messages.filter((message) => message.from === user);
-
-        if (user) {
-            messagesFiltered = messages
-                .filter((message) => message.to === "Todos")
-                .filter((message) => message.to === user)
-                .filter((message) => message.from === user);
-            // messages = await db
-            //     .collection("messages")
-            //     .find({ $or: [{ from: user }, { to: { $in: ["Todos", user] } }] })
-            //     .toArray();
-        } else {
-            return res.status(422);
-        }
-
-        // console.log(messagesAll);
-        // console.log(messagePrivateSend);
-        // console.log(messagePrivateReceived);
+        console.log("entrou");
+        // let messagesFiltered = await messages
+        //     .filter((message) => {
+        //         if (message.to === "Todos") {
+        //             return message;
+        //         }
+        //     })
+        //     .filter((message) => {
+        //         if (message.to === user) {
+        //             return message;
+        //         }
+        //     })
+        //     .filter((message) => {
+        //         if (message.from === user) {
+        //             return message;
+        //         }
+        //     });
         // const messageSend = messages.map((message) => {
         //     return { to: message.to, text: message.text, type: message.type, from: message.from };
         // });
+        const messages = await db
+            .collection("messages")
+            .find({ $or: [{ from: user }, { to: { $in: ["Todos", user] } }] })
+            .toArray();
 
-        const ultimasMessages = [...messagesFiltered].reverse().slice(0, parseInt(limit)).reverse();
+        console.log(messages);
 
+        const ultimasMessages = [...messages].reverse().slice(0, parseInt(limit)).reverse();
+
+        console.log(messages);
         if (limit) {
             return res.send(ultimasMessages);
         }
 
-        return res.send(messagesFiltered);
+        return res.send(messages);
     } catch (error) {
         console.log(error);
         return res.status(404).send(error);
