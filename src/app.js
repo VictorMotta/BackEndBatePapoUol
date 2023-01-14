@@ -101,9 +101,7 @@ app.get("/messages", async (req, res) => {
         //             return message;
         //         }
         //     });
-        // const messageSend = messages.map((message) => {
-        //     return { to: message.to, text: message.text, type: message.type, from: message.from };
-        // });
+
         const messages = await db
             .collection("messages")
             .find({ $or: [{ from: user }, { to: { $in: ["Todos", user] } }] })
@@ -115,10 +113,21 @@ app.get("/messages", async (req, res) => {
 
         console.log(messages);
         if (limit) {
-            return res.send(ultimasMessages);
+            const modifyMessageBody = ultimasMessages.map((message) => {
+                return {
+                    to: message.to,
+                    text: message.text,
+                    type: message.type,
+                    from: message.from,
+                };
+            });
+            return res.send(modifyMessageBody);
         }
+        const messageSend = messages.map((message) => {
+            return { to: message.to, text: message.text, type: message.type, from: message.from };
+        });
 
-        return res.send(messages);
+        return res.send(messageSend);
     } catch (error) {
         console.log(error);
         return res.status(404).send(error);
