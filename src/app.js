@@ -75,7 +75,9 @@ app.get("/messages", async (req, res) => {
     const { limit } = req.query;
     const user = req.headers.user;
 
-    console.log(user);
+    if (limit <= 0) {
+        return res.sendStatus(422);
+    }
 
     try {
         let messages;
@@ -106,7 +108,7 @@ app.post("/messages", async (req, res) => {
     const { to, text, type } = req.body;
     const user = req.headers.user;
     const milissegundos = Date.now();
-    const date = dayjs(milissegundos).format("HH:mm:ss");
+    const time = dayjs(milissegundos).format("HH:mm:ss");
 
     const messageSchema = joi.object({
         to: joi.string().required(),
@@ -120,8 +122,6 @@ app.post("/messages", async (req, res) => {
         { abortEarly: false }
     );
 
-    console.log(validation.error);
-
     if (validation.error) {
         const errors = validation.error.details.map((detail) => detail.message);
         return res.status(422).send(errors);
@@ -132,7 +132,7 @@ app.post("/messages", async (req, res) => {
     if (!checkUser) return res.sendStatus(422);
 
     try {
-        await db.collection("messages").insertOne({ from: user, to, text, type, date });
+        await db.collection("messages").insertOne({ from: user, to, text, type, time });
         return res.sendStatus(201);
     } catch (error) {
         console.log(error);
@@ -144,23 +144,16 @@ app.post("/status", async (req, res) => {
     const user = req.headers.user;
     const milissegundos = Date.now();
 
-    console.log(milissegundos);
     const checkUser = await db.collection("participants").find({ name: user }).toArray();
-
-    console.log(checkUser);
 
     if (!checkUser || checkUser === null) {
         return res.status(404);
     }
-    console.log(checkUser);
 
     try {
         const result = await db
             .collection("participants")
             .updateOne({ name: user }, { $set: { lastStatus: milissegundos } });
-
-        console.log(result.modifiedCount);
-        console.log(result);
 
         if (result.modifiedCount === 0) return res.status(404).send("Esse usuário não existe!");
 
