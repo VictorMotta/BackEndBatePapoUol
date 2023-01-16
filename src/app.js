@@ -72,10 +72,10 @@ app.post("/participants", async (req, res) => {
 });
 
 app.get("/messages", async (req, res) => {
-    const { limit } = req.query;
+    const limit = parseInt(req.query.limit);
     const user = req.headers.user;
 
-    if (limit <= 0) {
+    if (limit <= 0 || typeof limit != "number") {
         return res.sendStatus(422);
     }
     if (!user) {
@@ -90,7 +90,7 @@ app.get("/messages", async (req, res) => {
             .find({ $or: [{ from: user }, { to: { $in: ["Todos", user] } }] })
             .toArray();
 
-        const ultimasMessages = [...messages].reverse().slice(0, parseInt(limit));
+        const ultimasMessages = [...messages].reverse().slice(0, limit);
 
         if (limit) {
             return res.send(ultimasMessages);
