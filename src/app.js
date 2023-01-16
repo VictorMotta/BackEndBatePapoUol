@@ -90,7 +90,7 @@ app.get("/messages", async (req, res) => {
             .find({ $or: [{ from: user }, { to: { $in: ["Todos", user] } }] })
             .toArray();
 
-        const ultimasMessages = [...messages].reverse().slice(0, parseInt(limit)).reverse();
+        const ultimasMessages = [...messages].reverse().slice(0, parseInt(limit));
 
         if (limit) {
             return res.send(ultimasMessages);
